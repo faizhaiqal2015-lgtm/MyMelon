@@ -46,13 +46,36 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Fix My Melon source code
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          project = Path("${{ github.workspace }}") / "${{ env.PROJECT_DIR }}"
+          file = project / "app/src/main/java/com/melonfarm/planner/MainActivity.kt"
+
+          text = file.read_text()
+
+          bad = '''    val ec = when {
+            itDay(start, 1) <= 14 -> "1.8"
+            else -> "2.0"
+        }
+        '''
+
+          if bad in text:
+              text = text.replace(bad, "", 1)
+              file.write_text(text)
+              print("Fixed MainActivity.kt")
+          else:
+              print("No invalid block found; continuing.")
+          PY
+
       - name: Fix Java and Kotlin JVM target
         run: |
           cd "$PROJECT_DIR"
 
           cat >> app/build.gradle.kts <<'EOF'
 
-          // My Melon build compatibility
           android {
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
@@ -64,8 +87,6 @@ jobs:
               jvmToolchain(17)
           }
           EOF
-
-          echo "Java/Kotlin JVM target set to 17"
 
       - name: Build My Melon
         run: |
