@@ -18,19 +18,18 @@ jobs:
         run: |
           mkdir extracted
           unzip -q *.zip -d extracted
-          echo "Project extracted successfully"
 
       - name: Find Android project
         run: |
           PROJECT_DIR=$(find extracted -name settings.gradle.kts -type f -exec dirname {} \; | head -1)
 
           if [ -z "$PROJECT_DIR" ]; then
-            echo "Android project not found!"
+            echo "Android project not found"
             exit 1
           fi
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Android project: $PROJECT_DIR"
+          echo "Project found at $PROJECT_DIR"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -46,33 +45,12 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Fix My Melon source code
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          project = Path("${{ github.workspace }}") / "${{ env.PROJECT_DIR }}"
-          file = project / "app/src/main/java/com/melonfarm/planner/MainActivity.kt"
-
-          text = file.read_text()
-
-          bad = '''    val ec = when {
-            itDay(start, 1) <= 14 -> "1.8"
-            else -> "2.0"
-        }
-        '''
-
-          if bad in text:
-              text = text.replace(bad, "", 1)
-              file.write_text(text)
-              print("Fixed MainActivity.kt")
-          else:
-              print("No invalid block found; continuing.")
-          PY
-
-      - name: Fix Java and Kotlin JVM target
+      - name: Fix Java and Kotlin
         run: |
           cd "$PROJECT_DIR"
+
+          sed -i '/val ec = when {/,/^        }/d' \
+            app/src/main/java/com/melonfarm/planner/MainActivity.kt
 
           cat >> app/build.gradle.kts <<'EOF'
 
@@ -98,7 +76,7 @@ jobs:
           cd "$PROJECT_DIR"
 
           if [ ! -f app/build/outputs/apk/debug/app-debug.apk ]; then
-            echo "APK was not generated!"
+            echo "APK was not generated"
             exit 1
           fi
 
